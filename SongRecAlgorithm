@@ -1,0 +1,156 @@
+# approach: https://towardsdatascience.com/overview-of-text-similarity-metrics-3397c4601f50
+# K closest: https://towardsdatascience.com/machine-learning-basics-with-the-k-nearest-neighbors-algorithm-6a6e71d01761
+
+import csv
+import numpy as np
+import random
+import operator
+from sklearn.cluster import KMeans
+from textblob import TextBlob
+
+#attributes that you want to store
+_combinedData = []
+_names = []
+_k = 5 # number of clusters
+_centroids= []
+_output = []
+
+
+# main function
+def main():
+    _combinedData = readInData()
+    # avgGenre= computeAverageGenre(_genres)
+    # _jaccardScores = computeGenreSimilarity(avgGenre, _genres)
+    # find the closest centroids based on the data
+    _centroids = init_centroids(_combinedData)
+    print(_centroids)
+    # print(_centroids.shape)
+    _output,closest_centroids = run(_combinedData[1:], _names, _centroids) # splice to get rid of headers
+    #print(_centroids, closest_centroids)
+
+
+# function that reads in and parses the data from a csv
+def readInData():
+    with open('data/brown_songs.csv') as songs_with_genre:
+        csv_reader = csv.reader(songs_with_genre, delimiter=',')
+        combinedData = []
+        for row in csv_reader:
+            curRow = np.zeros((1,14))
+            # should have 12 attributes
+            if len(row) != 14:
+                continue
+            curName = row[0]
+            textblob = TextBlob(curName)
+            nameSentiment = textblob.sentiment.polarity
+            _names.append(curName)
+            curRow[0][0]= nameSentiment
+            # _trackNames.append(curName)
+            # _nameSentiment.append(nameSentiment)
+            curGenre = row[3]
+            textblob = TextBlob(curGenre)
+            genreSentiment = textblob.sentiment.polarity
+            curRow[0][1] = genreSentiment
+            try:
+                curRow[0][2] = float(row[4])
+                curRow[0][3] = float(row[5])
+                curRow[0][4] = float(row[7])
+                curRow[0][5] = float(row[8])
+                curRow[0][6] = float(row[9])
+                curRow[0][7] = float(row[10])
+                curRow[0][8] = float(row[11])
+                curRow[0][9] = float(row[12])
+                curRow[0][10] = float(row[13])
+            except:
+                print("could not be converted in to a float")
+            combinedData.append(curRow)
+        combinedData = np.array(combinedData)
+        # had to reshape this mother fucker
+        combinedData = np.reshape(combinedData, (combinedData.shape[0],14))
+    return combinedData
+
+
+def init_centroids(data):
+	"""
+	Selects k random rows from inputs and returns them as the chosen centroids
+	:return: a Numpy array of k cluster centroids, one per row
+	"""
+	rand = np.arange(len(data)-1)
+	np.random.shuffle(rand)
+	centroids = []
+	for r in range(0, _k):
+		index = rand[r]
+		centroids = np.append(centroids, data[index])
+	centroids = np.reshape(centroids,(_k,data.shape[1]))
+	np.array(centroids,dtype = 'float64')
+	return centroids
+
+def euclidean_dist(x, y):
+	"""
+	Computes the Euclidean distance between two points, x and y
+
+	:param x: the first data point, a Python numpy array
+	:param y: the second data point, a Python numpy array
+	:return: the Euclidean distance between x and y
+	"""
+	x = x.astype(np.float)
+	y = y.astype(np.float)
+	dist = np.linalg.norm(x - y)
+	return dist
+
+
+def closest_centroids(data, centroids):
+	"""
+	Computes the closest centroid for each data point in X, returning
+	an array of centroid indices
+
+	:return: an array of centroid indices
+	"""
+	centroidIndices = []
+	for d in np.array(data):
+		dist = np.sum((centroids-d.astype(np.float))**2, axis = 1)
+		index = np.argmin(dist)
+		centroidIndices.append(index)
+	return centroidIndices
+
+def compute_centroids(centroid_indices, centroids, data):
+	"""
+	Computes the centroids for each cluster, or the average of all data points
+	in the cluster
+
+	:param centroid_indices: a Numpy array of centroid indices, one for each datapoint in X
+	"""
+	centroidSet = set()
+	count = 0
+	for index in centroid_indices:
+		centroidSet.add(index)
+	for centroid in centroidSet:
+		results = []
+		for i in range(0,len(data)):
+			if(centroid_indices[i] == centroid):
+				results.append(data[i])
+		results = np.array(results,dtype = 'float64')
+		centroids[count] = np.average(results)
+		count+=1
+
+def run(data, names, centroids):
+	"""
+	Run the k-means algorithm on dataset X with K clusters.
+	Make sure to call closest_centroids and compute_centroids!
+	Check for convergence here, or whether you hit the max number of iterations.
+
+	return: centroids, closest_centroids
+	"""
+	closest = []
+	for i in range(0, 1000):
+		closest = closest_centroids(data, centroids)
+		# print(closest)
+		compute_centroids(closest, centroids, data)
+	for i in range(0, len(closest)):
+        # print out everything classified to the 0th centroid
+		if closest[i] == 0:
+		    print(names[i])
+	return(centroids,closest)
+
+#executable
+if __name__ == "__main__":
+    main()
